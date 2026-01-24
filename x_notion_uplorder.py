@@ -13,14 +13,14 @@ MDファイルの構造:
 import os
 import sys
 import re
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from dotenv import load_dotenv
 from notion_client import Client
 import requests
 
 # .envファイルを読み込む（90_System/.envから）
-env_path = Path(__file__).parent.parent.parent / "90_System" / ".env"
+env_path = Path("/Users/ishikawasuguru/Threads_piste/90_System/.env")
 load_dotenv(env_path)
 
 # Notion APIトークン（環境変数から読み込む）
@@ -93,7 +93,7 @@ def parse_markdown_posts(markdown_content):
             
             # 投稿予定日時を作成
             try:
-                scheduled_date = datetime(year, month, day, hour, minute)
+                scheduled_date = datetime(year, month, day, hour, minute, tzinfo=timezone(timedelta(hours=9)))
             except ValueError:
                 continue
             
@@ -140,7 +140,7 @@ def parse_markdown_posts(markdown_content):
                     content_lines = []
                 
                 # コメント欄
-                elif line == "**【コメント欄】**" or line == "**コメント欄**":
+                elif "**【コメント欄】**" in line or "**コメント欄**" in line or "**コメント**" in line:
                     # 既存の本文を保存
                     if current_section == "text" and content_lines:
                         post["text"] = "\n".join(content_lines).strip()
@@ -237,6 +237,7 @@ def get_property_name_mapping(database):
         "投稿日": "date",
         "本文": "rich_text",
         "コメント欄": "rich_text",
+        "コメント": "rich_text",
         "ステータス": "select"
     }
     
@@ -322,16 +323,22 @@ def create_post_in_database(notion, database_id, post, property_mapping, all_pro
                 found = False
                 for prop_name, prop_info in all_properties.items():
                     if prop_info.get("type") == "rich_text":
-                        # 「本文」を含むか、または最初のrich_text型プロパティを使用
-                        if "本文" in prop_name or not found:
+                        # 「本文」を含むか、または最初のrich_text型プロパティを使用（ただしコメントっぽくないもの）
+                        if "本文" in prop_name:
+                             properties[prop_name] = {
+                                "rich_text": [{
+                                    "text": {"content": post["text"][:2000]}
+                                }]
+                            }
+                             found = True
+                             break
+                        elif not found and "コメント" not in prop_name:
                             properties[prop_name] = {
                                 "rich_text": [{
                                     "text": {"content": post["text"][:2000]}
                                 }]
                             }
                             found = True
-                            if "本文" in prop_name:
-                                break
         
         # コメント欄プロパティ
         if post["comment"]:
@@ -342,21 +349,34 @@ def create_post_in_database(notion, database_id, post, property_mapping, all_pro
                         "text": {"content": post["comment"][:2000]}  # Notionの制限
                     }]
                 }
+            elif "コメント" in property_mapping:
+                comment_prop_name = property_mapping["コメント"]
+                properties[comment_prop_name] = {
+                    "rich_text": [{
+                        "text": {"content": post["comment"][:2000]}  # Notionの制限
+                    }]
+                }
             else:
                 # コメント欄プロパティが見つからない場合、rich_text型のプロパティを探す
                 found = False
                 for prop_name, prop_info in all_properties.items():
                     if prop_info.get("type") == "rich_text":
-                        # 「コメント」を含むか、または最初のrich_text型プロパティを使用
-                        if "コメント" in prop_name or not found:
+                        # 「コメント」を含むか、または最初のrich_text型プロパティを使用（ただし本文っぽくないもの）
+                        if "コメント" in prop_name:
+                             properties[prop_name] = {
+                                "rich_text": [{
+                                    "text": {"content": post["comment"][:2000]}
+                                }]
+                            }
+                             found = True
+                             break
+                        elif not found and "本文" not in prop_name:
                             properties[prop_name] = {
                                 "rich_text": [{
                                     "text": {"content": post["comment"][:2000]}
                                 }]
                             }
                             found = True
-                            if "コメント" in prop_name:
-                                break
         
         # ステータスプロパティ（全て「未着手」を選択）
         if "ステータス" in property_mapping:
