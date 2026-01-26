@@ -26,10 +26,10 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 # --- 設定 ---
 
 # Google DriveフォルダID
-DRIVE_FOLDER_ID = "16pMNNI_5lLPcDGIbHNxDRjQ1zczcd5Na"
+DRIVE_FOLDER_ID = "1nwfO4lvWDsoFynQSHvo4AEHIvZpVMQr6"
 
 # NotionデータベースURL
-NOTION_DATABASE_URL = "https://www.notion.so/2f2c991b527b803eaa40df67788a9df7?v=2f2c991b527b8046a921000c186c175f&source=copy_link"
+NOTION_DATABASE_URL = "https://www.notion.so/2f4c991b527b8062b0a9d7bc5b1f4e24?v=2f4c991b527b802695e6000c4d0de150&source=copy_link"
 
 # パス設定
 BASE_DIR = Path(__file__).parent
@@ -117,10 +117,15 @@ def list_drive_files(service, folder_id):
 def parse_filename(filename):
     """ファイル名から日時と枝番を抽出"""
     # パターン: YYYY-MMDD-HHMM(-N).ext
-    # 例: 2026-0126-2000-1.png -> 2026-01-26 20:00, 1
-    # 例: 2026-0125-0900.png   -> 2026-01-25 09:00, 1 (default)
+    # パターン: 2026-01-30-6_00 piste_threads.png
     
     stem = Path(filename).stem
+    
+    # 新しい形式: 2026-01-30-6_00 piste_threads.png
+    match_new = re.match(r'(\d{4})-(\d{2})-(\d{2})-(\d{1,2})_(\d{2})', stem)
+    if match_new:
+        year, month, day, hour, minute = map(int, match_new.groups())
+        return datetime(year, month, day, hour, minute, tzinfo=JST), 1
     
     # 枝番あり
     match_branch = re.match(r'(\d{4})-(\d{2})(\d{2})-(\d{2})(\d{2})-(\d+)', stem)
@@ -171,14 +176,16 @@ def get_notion_pages(notion, database_id):
     return pages
 
 def find_page_by_date(pages, target_date):
-    """指定された日時のページを探す"""
+    """指定された日時のページを探す（完全一致または近似）"""
     # target_dateはJST aware
+    
+    candidates = []
     
     for page in pages:
         props = page.get("properties", {})
         
         # 投稿日プロパティを探す (Prop name might vary, check "投稿日" or type date)
-        date_prop = props.get("投稿日")
+        date_prop = props.get("投稿日") or props.get("投稿日時")
         if not date_prop:
              # Fallback: search for any date property
             for k, v in props.items():
@@ -192,12 +199,39 @@ def find_page_by_date(pages, target_date):
                 try:
                     # ISO format parse
                     page_date = datetime.fromisoformat(start_iso)
-                    # Adjust to JST if matched (or just compare timestamp)
+                    
+                    # 完全一致チェック
                     if page_date == target_date:
                         return page
+                        
+                    # 候補リストに追加（日付ペア）
+                    candidates.append((page, page_date))
                 except ValueError:
                     continue
-    return None
+    
+    # 完全一致がない場合、近似マッチを試みる（同じ日、かつ3時間以内）
+    if not candidates:
+        return None
+        
+    closest_page = None
+    min_diff = None
+    
+    for page, page_date in candidates:
+        # 同じ日付か確認
+        if page_date.date() == target_date.date():
+            # 時間差を計算（絶対値）
+            diff = abs((page_date - target_date).total_seconds())
+            
+            # 3時間（10800秒）以内
+            if diff <= 10800:
+                if min_diff is None or diff < min_diff:
+                    min_diff = diff
+                    closest_page = page
+    
+    if closest_page:
+        print(f"  ⚠ 完全一致なし: 近似ページを採用します (時間差: {min_diff/60:.1f}分)")
+        
+    return closest_page
 
 def update_page_url(notion, page_id, branch_num, url, existing_props):
     """ページのURLプロパティを更新"""
