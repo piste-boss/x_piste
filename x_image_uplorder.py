@@ -19,10 +19,10 @@ from googleapiclient.errors import HttpError
 import pickle
 
 # 画像ディレクトリのパス
-IMAGE_DIRECTORY = Path("/Users/ishikawasuguru/x_piste/x_image")
+IMAGE_DIRECTORY = Path("/Users/ishikawasuguru/x_ai/x_image")
 
 # GoogleドライブフォルダID（URLから抽出）
-DRIVE_FOLDER_ID = "16pMNNI_5lLPcDGIbHNxDRjQ1zczcd5Na"
+DRIVE_FOLDER_ID = "1nwfO4lvWDsoFynQSHvo4AEHIvZpVMQr6"
 
 # サービスアカウントJSONファイルのパス
 SERVICE_ACCOUNT_FILE = Path(__file__).parent.parent.parent / "90_System" / "service_account.json.json"

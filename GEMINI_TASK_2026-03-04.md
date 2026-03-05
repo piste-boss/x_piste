@@ -2,15 +2,15 @@
 
 ## 概要
 
-Piste X の未生成画像約126枚を生成し、Googleドライブへアップロード、NotionへのURL同期まで実行してください。
+AI X の未生成画像62枚を生成し、Googleドライブへアップロード、NotionへのURL同期まで実行してください。
 
 ## 作業ディレクトリ
 
-`/Users/ishikawasuguru/x_piste/`
+`/Users/ishikawasuguru/x_ai/`
 
 ---
 
-## Step 1: 画像生成（約126枚）
+## Step 1: 画像生成（62枚）
 
 `x_image_prompt.md` の全セクションのプロンプトから画像を生成してください。
 
@@ -28,19 +28,19 @@ YYYY-MMDD-HHMM(-N).png
 
 ### 優先度
 
-直近の投稿分（3/4〜3/8）を最優先で生成し、その後過去分を順次生成してください。
+直近の投稿分（3/4〜3/7）を最優先で生成し、その後過去分を順次生成してください。
 
 ---
 
 ## Step 2: Googleドライブへアップロード
 
-cd /Users/ishikawasuguru/x_piste && python3 x_image_uplorder.py
+cd /Users/ishikawasuguru/x_ai && python3 x_image_uplorder.py
 
 ---
 
 ## Step 3: NotionへのURL同期
 
-cd /Users/ishikawasuguru/x_piste && python3 x_drive_to_notion.py
+cd /Users/ishikawasuguru/x_ai && python3 x_drive_to_notion.py
 
 ---
 

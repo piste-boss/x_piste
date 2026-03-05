@@ -27,10 +27,10 @@ load_dotenv(env_path)
 NOTION_API_KEY = os.getenv("NOTION_API_KEY")
 
 # MDファイルのパス
-MARKDOWN_FILE = Path("/Users/ishikawasuguru/x_piste/x_post.md")
+MARKDOWN_FILE = Path("/Users/ishikawasuguru/x_ai/x_post.md")
 
 # NotionデータベースURL
-NOTION_DATABASE_URL = "https://www.notion.so/2f2c991b527b803eaa40df67788a9df7?v=2f2c991b527b8046a921000c186c175f&source=copy_link"
+NOTION_DATABASE_URL = "https://www.notion.so/2f4c991b527b8062b0a9d7bc5b1f4e24?v=2f4c991b527b802695e6000c4d0de150&source=copy_link"
 
 
 def extract_database_id_from_url(url):
@@ -80,11 +80,11 @@ def parse_markdown_posts(markdown_content):
                 continue
             
             time_lines = time_section.split('\n')
-            # 時間行を抽出（例: "09:00：プライベート/日常（画像1枚）"）
-            time_line = time_lines[0].strip()
+            # 時間行を抽出（例: "09:00 [カテゴリ] タイトル"）
+            header_line = time_lines[0].strip()
             
             # 時間を抽出（例: "09:00"）
-            time_match = re.search(r'(\d{1,2}):(\d{2})', time_line)
+            time_match = re.search(r'(\d{1,2}):(\d{2})', header_line)
             if not time_match:
                 continue
             
@@ -104,78 +104,23 @@ def parse_markdown_posts(markdown_content):
                 "comment": ""
             }
             
-            current_section = None
-            content_lines = []
+            # タイトル抽出: 時間の後ろの部分
+            # 例: "07:30 [有益/ノウハウ] 週の始まり" -> "[有益/ノウハウ] 週の始まり"
+            title_part = header_line[time_match.end():].strip()
+            post["title"] = title_part
             
-            for i, line in enumerate(time_lines[1:], 1):
-                line = line.strip()
-                
-                # タイトル
-                if line.startswith('**タイトル**'):
-                    # タイトルを抽出（同じ行にタイトルがある場合）
-                    title_match = re.search(r'\*\*タイトル\*\*:\s*(.+)', line)
-                    if title_match:
-                        post["title"] = title_match.group(1).strip()
-                    else:
-                        # 次の行にタイトルがある場合
-                        if i < len(time_lines) - 1:
-                            next_line = time_lines[i + 1].strip()
-                            if next_line and not next_line.startswith('**'):
-                                post["title"] = next_line
-                    current_section = None
-                    content_lines = []
-                
-                # 種別（スキップ）
-                elif line.startswith('**種別**'):
-                    current_section = None
-                    content_lines = []
-                
-                # 本文
-                elif line == "**【本文】**" or line == "**本文**":
-                    # 既存のセクションの内容を保存
-                    if current_section == "comment" and content_lines:
-                        post["comment"] = "\n".join(content_lines).strip()
-                    
-                    current_section = "text"
-                    content_lines = []
-                
-                # コメント欄
-                elif "**【コメント欄】**" in line or "**コメント欄**" in line or "**コメント**" in line:
-                    # 既存の本文を保存
-                    if current_section == "text" and content_lines:
-                        post["text"] = "\n".join(content_lines).strip()
-                    
-                    current_section = "comment"
-                    content_lines = []
-                
-                # 区切り線
-                elif line.startswith('---'):
-                    # 現在のセクションの内容を保存
-                    if current_section == "text" and content_lines:
-                        post["text"] = "\n".join(content_lines).strip()
-                    elif current_section == "comment" and content_lines:
-                        post["comment"] = "\n".join(content_lines).strip()
+            # 本文抽出: ヘッダー行以降のすべて
+            content_lines = time_lines[1:]
+            
+            # 空行を除去しつつ本文を結合
+            text_body = []
+            for line in content_lines:
+                # 区切り線があったら終了
+                if line.strip().startswith('---'):
                     break
-                
-                # コンテンツ行
-                else:
-                    if current_section and line:
-                        content_lines.append(line)
+                text_body.append(line)
             
-            # 最後のセクションの内容を保存
-            if current_section == "text" and content_lines:
-                post["text"] = "\n".join(content_lines).strip()
-            elif current_section == "comment" and content_lines:
-                post["comment"] = "\n".join(content_lines).strip()
-            
-            # タイトルが空の場合、時間と種別から生成
-            if not post["title"]:
-                # 時間行から種別を抽出（例: "プライベート/日常"）
-                category_match = re.search(r'：(.+?)(?:（|$)', time_line)
-                if category_match:
-                    post["title"] = f"{time_line.split('：')[0]} - {category_match.group(1)}"
-                else:
-                    post["title"] = f"{hour:02d}:{minute:02d} 投稿"
+            post["text"] = "\n".join(text_body).strip()
             
             # 有効な投稿のみ追加（タイトルと投稿予定日時があればOK）
             if post["title"] and post["scheduled_date"]:
