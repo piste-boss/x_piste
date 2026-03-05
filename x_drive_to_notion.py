@@ -118,9 +118,17 @@ def parse_filename(filename):
     """ファイル名から日時と枝番を抽出"""
     # パターン: YYYY-MMDD-HHMM(-N).ext
     # パターン: 2026-01-30-6_00 piste_threads.png
+    # パターン: 2026-01-26-07:30.png (ユーザー指定)
     
     stem = Path(filename).stem
     
+    # ユーザー指定形式: 2026-01-26-07:30.png (コロン付き)
+    # ファイルシステムによってはコロンがアンダースコア等に置換される場合もあるため両方対応
+    match_colon = re.match(r'(\d{4})-(\d{2})-(\d{2})-(\d{2})[:_](\d{2})', stem)
+    if match_colon:
+        year, month, day, hour, minute = map(int, match_colon.groups())
+        return datetime(year, month, day, hour, minute, tzinfo=JST), 1
+        
     # 新しい形式: 2026-01-30-6_00 piste_threads.png
     match_new = re.match(r'(\d{4})-(\d{2})-(\d{2})-(\d{1,2})_(\d{2})', stem)
     if match_new:
